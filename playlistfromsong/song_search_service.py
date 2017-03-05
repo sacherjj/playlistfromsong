@@ -1,11 +1,15 @@
 import requests
 from lxml import html
 from urllib.parse import unquote
+from collections import namedtuple
 
 
 class SongSearchService(object):
-    def get_songs(self, search_string):
+    def get_songs(self, search_string, limit=None):
         raise NotImplementedError
+
+
+LastFMLink = namedtuple('LastFMLink', 'artist song url')
 
 
 class TuneFM(SongSearchService):
@@ -31,7 +35,7 @@ class TuneFM(SongSearchService):
             return None
         artist_name = unquote(url_parts[4]).replace('+', ' ')
         song_name = unquote(url_parts[-1]).replace('+', ' ')
-        return artist_name, song_name, url
+        return LastFMLink(artist_name, song_name, url)
 
     @staticmethod
     def _process_lastfm_link(url):
@@ -57,7 +61,7 @@ class TuneFM(SongSearchService):
                 lastfm_tracks.append('https://www.last.fm' + track.attrib['href'])
         return youtube_url, lastfm_tracks
 
-    def get_songs(self, search_string, limit=0):
+    def get_songs(self, search_string, limit=None):
         current_url = self.get_initial_url(search_string)
         lastfm_links = []
         yield_count = 0
@@ -65,9 +69,9 @@ class TuneFM(SongSearchService):
             data = self.get_youtube_and_links_from_url(current_url)
             current_url = None
             if data:
-                youtube_url, artist_name, song_name, url, full_list = data
-                lastfm_links.extend(set([full[2] for full in full_list]) - self.used_links)
-                yield youtube_url, artist_name, song_name
+                youtube_url, lastfm_link, full_links = data
+                lastfm_links.extend(set([link.url for link in full_links]) - self.used_links)
+                yield youtube_url, lastfm_link
                 yield_count += 1
                 try:
                     current_url = lastfm_links.pop()
@@ -79,16 +83,16 @@ class TuneFM(SongSearchService):
     def get_youtube_and_links_from_url(self, lastfm_url):
         if lastfm_url not in self.used_links:
             self.used_links.add(lastfm_url)
-            artist_song = self._parse_artist_song(lastfm_url)
-            if artist_song:
-                artist_name, song_name, url = artist_song
+            lastfm_link = self._parse_artist_song(lastfm_url)
+            if lastfm_link:
+                artist_name, song_name, url = lastfm_link
                 results = self._process_lastfm_link(lastfm_url)
                 if results:
                     youtube_url, lastfm_links = results
                     unused_links = list(set(lastfm_links) - self.used_links)
                     # Get full data for display, but limit list to NUMBER_LINKS length
-                    unused_full_data = [self._parse_artist_song(url) for url in unused_links[:self.NUMBER_LINKS]]
-                    return youtube_url, artist_name, song_name, url, unused_full_data
+                    unused_links = [self._parse_artist_song(url) for url in unused_links[:self.NUMBER_LINKS]]
+                    return youtube_url, lastfm_link, unused_links
 
     def get_initial_url(self, search_string):
         return self._get_first_lastfm_url(search_string)
@@ -98,11 +102,16 @@ class Spotify(SongSearchService):
     def __init__(self, token):
         self.token = token
 
-    def get_songs(self, search_string):
-        pass
+    def get_songs(self, search_string, limit=None):
+        raise NotImplementedError
 
 
 if __name__ == '__main__':
     tfm = TuneFM()
+    url = tfm.get_initial_url('John Williams')
+    youtube_link, lastfm, related = tfm.get_youtube_and_links_from_url(url)
+    print(youtube_link, lastfm, related)
+
     for song in tfm.get_songs('John Williams Superman', 10):
         print(song)
+
