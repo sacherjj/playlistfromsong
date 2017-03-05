@@ -20,15 +20,6 @@ class TuneFM(SongSearchService):
         self.used_links = set()
 
     @staticmethod
-    def _get_first_lastfm_url(search_string):
-        r = requests.get('https://www.last.fm/search?', {'q': search_string})
-        tree = html.fromstring(r.content)
-        possible_tracks = tree.xpath('//span/a[@class="link-block-target"]')
-        for i, track in enumerate(possible_tracks):
-            return 'https://www.last.fm' + track.attrib['href']
-        return ""
-
-    @staticmethod
     def _parse_artist_song(url):
         url_parts = url.split('/')
         if len(url_parts) < 6:
@@ -94,8 +85,14 @@ class TuneFM(SongSearchService):
                     unused_links = [self._parse_artist_song(url) for url in unused_links[:self.NUMBER_LINKS]]
                     return youtube_url, lastfm_link, unused_links
 
-    def get_initial_url(self, search_string):
-        return self._get_first_lastfm_url(search_string)
+    @staticmethod
+    def get_initial_url(search_string):
+        r = requests.get('https://www.last.fm/search?', {'q': search_string})
+        tree = html.fromstring(r.content)
+        possible_tracks = tree.xpath('//span/a[@class="link-block-target"]')
+        for i, track in enumerate(possible_tracks):
+            return 'https://www.last.fm' + track.attrib['href']
+        return None
 
 
 class Spotify(SongSearchService):
