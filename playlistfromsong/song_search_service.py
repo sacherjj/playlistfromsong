@@ -9,6 +9,12 @@ class SongSearchService(object):
 
 
 class TuneFM(SongSearchService):
+
+    NUMBER_LINKS = 10
+
+    def __init__(self):
+        self.used_links = set()
+
     @staticmethod
     def _get_first_lastfm_url(search_string):
         r = requests.get('https://www.last.fm/search?', {'q': search_string})
@@ -25,7 +31,7 @@ class TuneFM(SongSearchService):
             return None
         artist_name = unquote(url_parts[4]).replace('+', ' ')
         song_name = unquote(url_parts[-1]).replace('+', ' ')
-        return artist_name, song_name
+        return artist_name, song_name, url
 
     @staticmethod
     def _process_lastfm_link(url):
@@ -51,23 +57,41 @@ class TuneFM(SongSearchService):
                 lastfm_tracks.append('https://www.last.fm' + track.attrib['href'])
         return youtube_url, lastfm_tracks
 
-    def get_songs(self, search_string):
-        current_url = self._get_first_lastfm_url(search_string)
-        lastfm_links = [current_url]
+    def get_songs(self, search_string, limit=0):
+        current_url = self.get_initial_url(search_string)
+        lastfm_links = []
+        yield_count = 0
+        while current_url:
+            data = self.get_youtube_and_links_from_url(current_url)
+            current_url = None
+            if data:
+                youtube_url, artist_name, song_name, url, full_list = data
+                lastfm_links.extend(set([full[2] for full in full_list]) - self.used_links)
+                yield youtube_url, artist_name, song_name
+                yield_count += 1
+                try:
+                    current_url = lastfm_links.pop()
+                except IndexError:
+                    current_url = None
+            if limit and yield_count >= limit:
+                current_url = None
 
-        used_links = set()
-        while lastfm_links:
-            current_url = lastfm_links.pop()
-            if current_url not in used_links:
-                used_links.add(current_url)
-                artist_song = self._parse_artist_song(current_url)
-                if artist_song:
-                    artist_name, song_name = artist_song
-                    results = self._process_lastfm_link(current_url)
-                    if results:
-                        youtube_url, new_lastfm_links = results
-                        lastfm_links.extend(set(new_lastfm_links)-used_links)
-                        yield youtube_url, artist_name, song_name
+    def get_youtube_and_links_from_url(self, lastfm_url):
+        if lastfm_url not in self.used_links:
+            self.used_links.add(lastfm_url)
+            artist_song = self._parse_artist_song(lastfm_url)
+            if artist_song:
+                artist_name, song_name, url = artist_song
+                results = self._process_lastfm_link(lastfm_url)
+                if results:
+                    youtube_url, lastfm_links = results
+                    unused_links = list(set(lastfm_links) - self.used_links)
+                    # Get full data for display, but limit list to NUMBER_LINKS length
+                    unused_full_data = [self._parse_artist_song(url) for url in unused_links[:self.NUMBER_LINKS]]
+                    return youtube_url, artist_name, song_name, url, unused_full_data
+
+    def get_initial_url(self, search_string):
+        return self._get_first_lastfm_url(search_string)
 
 
 class Spotify(SongSearchService):
@@ -80,5 +104,5 @@ class Spotify(SongSearchService):
 
 if __name__ == '__main__':
     tfm = TuneFM()
-    for song in tfm.get_songs('Every Rose'):
+    for song in tfm.get_songs('John Williams Superman', 10):
         print(song)
