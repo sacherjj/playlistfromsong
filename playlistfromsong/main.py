@@ -37,13 +37,14 @@ class MainWindow(tk.Tk):
         self.youtube = ''
         self.current_link = None
         self.links = deque()
-        self.future_data = None
+        self.pending_links = None  # Holds links of current choice.  Included if Accepted.
+        self.future_data = None  # Holds prefetched data.
         self.after(1000, self.update)
 
     def update(self):
         if self.downloader.work_left:
             count = self.downloader.queue_count + 1
-            self.status_bar.text = 'Downloading {}...'.format(count)
+            self.status_bar.text = 'Downloading...  {} left.'.format(count)
             self.downloader.process_queue()
         else:
             self.status_bar.text = ''
@@ -52,7 +53,13 @@ class MainWindow(tk.Tk):
     def reject_song(self):
         self.next_song()
 
+    def extend_links(self):
+        if self.pending_links:
+            self.links.extend(list(set(self.pending_links) - set(self.links)))
+            self.pending_links = None
+
     def accept_song(self):
+        self.extend_links()
         self.downloader.add_to_queue(self.youtube)
         self.next_song()
 
@@ -73,8 +80,9 @@ class MainWindow(tk.Tk):
             else:
                 new_data = self.search_service.get_youtube_and_links_from_url(next_song.url)
         if new_data:
-            self.youtube, self.current_link, new_links = new_data
-            self.links.extend(list(set(new_links)-set(self.links)))
+            self.youtube, self.current_link, self.pending_links = new_data
+            if len(self.links) < 2:
+                self.extend_links()
             self.song_frame.load_songs(self.current_link, self.links)
             self.after(10, self.prefetch)
         else:
