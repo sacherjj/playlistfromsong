@@ -1,8 +1,11 @@
+REM  Batch File to build executable with PyInstaller on Windows
+
+REM  CANNOT make windowed only, due to subprocess.
 REM    --noconsole ^
 REM    --windowed ^
-REM    --clean ^
 
 pyinstaller --noconfirm ^
+    --clean ^
     --onefile ^
 	--noupx ^
 	--win-private-assemblies ^
