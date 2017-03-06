@@ -1,13 +1,12 @@
 import requests
 from lxml import html
 from urllib.parse import unquote
-from collections import namedtuple
+from collections import namedtuple, deque
 
 
 class SongSearchService(object):
     def get_songs(self, search_string, limit=None):
         raise NotImplementedError
-
 
 LastFMLink = namedtuple('LastFMLink', 'artist song url')
 
@@ -18,6 +17,7 @@ class TuneFM(SongSearchService):
 
     def __init__(self):
         self.used_links = set()
+        self.future_links = deque()
 
     @staticmethod
     def _parse_artist_song(url):
@@ -85,13 +85,12 @@ class TuneFM(SongSearchService):
                     unused_links = [self._parse_artist_song(url) for url in unused_links[:self.NUMBER_LINKS]]
                     return youtube_url, lastfm_link, unused_links
 
-    @staticmethod
-    def get_initial_url(search_string):
+    def get_initial_url(self, search_string):
         r = requests.get('https://www.last.fm/search?', {'q': search_string})
         tree = html.fromstring(r.content)
         possible_tracks = tree.xpath('//span/a[@class="link-block-target"]')
         for i, track in enumerate(possible_tracks):
-            return 'https://www.last.fm' + track.attrib['href']
+            return self._parse_artist_song('https://www.last.fm' + track.attrib['href'])
         return None
 
 

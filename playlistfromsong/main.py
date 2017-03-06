@@ -37,6 +37,7 @@ class MainWindow(tk.Tk):
         self.youtube = ''
         self.current_link = None
         self.links = deque()
+        self.future_data = None
         self.after(1000, self.update)
 
     def update(self):
@@ -55,30 +56,49 @@ class MainWindow(tk.Tk):
         self.downloader.add_to_queue(self.youtube)
         self.next_song()
 
+    def prefetch(self):
+        if self.links:
+            self.future_data = self.search_service.get_youtube_and_links_from_url(self.links[0].url)
+        self.song_frame.set_button_state('normal')
+
     def next_song(self):
+        self.song_frame.set_button_state('disabled')
         self.song_frame.clear_data()
         new_data = None
         while self.links and not new_data:
             next_song = self.links.popleft()
-            new_data = self.search_service.get_youtube_and_links_from_url(next_song.url)
+            if self.future_data:
+                new_data = self.future_data
+                self.future_data = None
+            else:
+                new_data = self.search_service.get_youtube_and_links_from_url(next_song.url)
         if new_data:
             self.youtube, self.current_link, new_links = new_data
             self.links.extend(list(set(new_links)-set(self.links)))
             self.song_frame.load_songs(self.current_link, self.links)
+            self.after(10, self.prefetch)
+        else:
+            self.status_bar.text = 'Nothing Found.'
 
     def do_search(self):
+        self.song_frame.set_button_state('disabled')
+        self.search_button['state'] = 'disabled'
         self.song_frame.clear_data()
         self.links.clear()
+        self.future_data = None
+        self.status_bar.text = 'Searching...'
+        self.after(10, self.async_search)
+
+    def async_search(self):
         value = self.search_var.get()
-        initial_url = self.search_service.get_initial_url(value)
-        if initial_url:
-            tunefm_data = self.search_service.get_youtube_and_links_from_url(initial_url)
-            if tunefm_data:
-                self.youtube, self.current_link, links = tunefm_data
-                self.links.extend(links)
-                self.song_frame.load_songs(self.current_link, self.links)
-                return
-        self.status_bar.set_timed_text('Nothing Found.', 5000)
+        link_data = self.search_service.get_initial_url(value)
+        if link_data:
+            self.links.append(link_data)
+            self.next_song()
+        else:
+            self.status_bar.text = 'Nothing Found.'
+        self.search_button['state'] = 'normal'
+
 
 if __name__ == '__main__':
     mw = MainWindow()

@@ -27,6 +27,8 @@ class SongList(tk.Frame):
         self.reject_button = ImageButton(self, 'x', self.rejected)
         self.reject_button.grid(row=1, column=3)
 
+        self.set_button_state('disabled')
+
         tk.Label(self, text='Releated Songs:', anchor=tk.W).grid(row=2, column=0, columnspan=2, sticky=tk.EW)
 
         for row_number in range(3, 18):
@@ -63,6 +65,10 @@ class SongList(tk.Frame):
             if i < len(self._artist_vars):
                 self._artist_vars[i].set(link.artist)
                 self._song_vars[i].set(link.song)
+
+    def set_button_state(self, state):
+        self.accept_button['state'] = state
+        self.reject_button['state'] = state
 
     def accept(self):
         self.parent.accept_song()
