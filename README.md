@@ -9,5 +9,5 @@ Functionality allows you to Approve and Reject songs, which will drive the direc
 
 # Pre Compiled
 
-[There is PyInstaller build binaries for Windows available.](https://github.com/sacherjj/playlistfromsong/tree/master/compiled)
+[There are PyInstaller build binaries for Windows available.](https://github.com/sacherjj/playlistfromsong/tree/master/compiled)
 
